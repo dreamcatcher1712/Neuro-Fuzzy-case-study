@@ -1,0 +1,67 @@
+import pandas as pd
+import re
+url = 'https://raw.githubusercontent.com/ShresthaSudip/SMS_Spam_Detection_DNN_LSTM_BiLSTM/master/SMSSpamCollection'
+df = pd.read_csv(url, sep ='\t',names=["label", "message"])
+classes = {"spam": 1, "ham": 0}
+df = df.replace({"label": classes})
+# Define a function to clean the text
+def clean_text(text):
+    # Remove special characters and numbers
+    text = re.sub(r'[^a-zA-Z]+', ' ', text)
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    # Remove extra whitespaces
+    text = re.sub(r'\s+', ' ', text)
+    
+    return text
+
+# Apply the cleaning function to the text column
+df["text_cleaned"] = df["message"].apply(clean_text)
+df['text_cleaned']=df['text_cleaned'].astype(str)
+
+X = df["text_cleaned"].values
+y = df["label"].values
+
+from sklearn.model_selection import train_test_split
+
+# Split the data into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+import random
+import numpy as np
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.svm import SVC
+
+
+# Vectorize the text data using TF-IDF
+vectorizer = TfidfVectorizer()
+train_vectors = vectorizer.fit_transform(X_train)
+test_vectors = vectorizer.transform(X_test)
+
+# Define a function to evaluate the accuracy of a SVM classifier
+def evaluate_svm(C, gamma):
+    svm = SVC(C=C, gamma=gamma)
+    svm.fit(train_vectors, y_train)
+    accuracy = svm.score(test_vectors, y_test)
+    return accuracy
+
+# Define the genetic algorithm to optimize the SVM parameters
+def genetic_algorithm(population_size, generations):
+    population = np.random.rand(population_size, 2)
+    for generation in range(generations):
+        fitness = np.array([evaluate_svm(C, gamma) for C, gamma in population])
+        best_index = np.argmax(fitness)
+        best_C, best_gamma = population[best_index]
+        print(f'Generation {generation}: Best accuracy {fitness[best_index]:.3f} (C={best_C:.3f}, gamma={best_gamma:.3f})')
+        new_population = []
+        for i in range(population_size):
+            parent1, parent2 = random.choices(population, k=2, weights=fitness)
+            child = (parent1 + parent2) / 2
+            new_population.append(child + np.random.normal(0, 0.1, size=2))
+        population = np.array(new_population)
+
+# Run the genetic algorithm
+genetic_algorithm(population_size=10, generations=4)
